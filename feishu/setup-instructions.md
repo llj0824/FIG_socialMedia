@@ -3,8 +3,18 @@
 ## Prerequisites
 - Feishu Developer Account
 - Tencent Cloud Account
-- Baidu ERNIE API Key
+- DeepSeek API Key ([Get one here](https://platform.deepseek.com/))
 - ~30 minutes setup time
+
+### Tencent Cloud Function Costs
+- **Free Tier**: 1 million requests/month + 400,000 GB-seconds compute
+- **Cost After Free Tier**:
+  - $0.0000167 per 100ms of duration (per GB memory)
+  - $0.002 per 10,000 requests
+- **Estimated Cost for This App**:
+  - 100 requests: ~$0.0167
+  - 1,000 requests: ~$0.167
+  - Very cost-effective for MVP testing
 
 ## Step 1: Create Feishu Open Platform App
 1. Go to [Feishu Open Platform](https://open.feishu.cn)
@@ -19,7 +29,7 @@
 4. Add environment variables:
    - FEISHU_APP_ID: Your Feishu App ID
    - FEISHU_APP_SECRET: Your Feishu App Secret
-   - BAIDU_API_KEY: Your Baidu ERNIE API key
+   - DEEPSEEK_API_KEY: Your DeepSeek API key
 
 ## Step 3: Set Up Feishu Form
 1. Create Feishu form with fields:

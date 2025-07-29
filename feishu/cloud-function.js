@@ -3,9 +3,11 @@ const { FeishuClient } = require('feishu-open-api-sdk');
 
 // Configuration
 const CONFIG = {
-  BAIDU_API_ENDPOINT: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions_pro',
+  DEEPSEEK_API_ENDPOINT: 'https://api.deepseek.com/v1/chat/completions',
   FEISHU_BOT_TOKEN: process.env.FEISHU_BOT_TOKEN,
-  BAIDU_API_KEY: process.env.BAIDU_API_KEY
+  DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
+  MODEL: 'deepseek-chat',
+  TEMPERATURE: 0.7
 };
 
 // Initialize Feishu client
@@ -57,29 +59,39 @@ function parseFormData(event) {
 }
 
 /**
- * Generate scripts using Baidu ERNIE API
+ * Generate scripts using DeepSeek API
  */
 async function generateScripts(content, count, wordCount) {
   const response = await axios.post(
-    CONFIG.BAIDU_API_ENDPOINT,
+    CONFIG.DEEPSEEK_API_ENDPOINT,
     {
+      model: CONFIG.MODEL,
       messages: [
         {
           role: 'user',
           content: buildPrompt(content, count, wordCount)
         }
       ],
-      stream: false
+      temperature: CONFIG.TEMPERATURE,
+      max_tokens: 4000
     },
     {
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${CONFIG.BAIDU_API_KEY}`
+        'Authorization': `Bearer ${CONFIG.DEEPSEEK_API_KEY}`,
+        'Content-Type': 'application/json'
       }
     }
   );
   
-  return response.data.result;
+  // Extract JSON from response content
+  const contentString = response.data.choices[0].message.content;
+  const jsonMatch = contentString.match(/\[[\s\S]*\]/);
+  
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  
+  throw new Error('Failed to parse JSON response');
 }
 
 /**
@@ -87,6 +99,26 @@ async function generateScripts(content, count, wordCount) {
  */
 function buildPrompt(content, count, wordCount) {
   return `你是一个短视频脚本创作专家。请根据以下内容，提取${count}个不同的主题，并为每个主题生成一个${wordCount}字的短视频脚本。
+
+注意：请严格按以下JSON格式返回，不要包含任何其他文字：
+[
+  {
+    "theme": "主题名称（10字以内）",
+    "content": "完整的脚本内容"
+  }
+]
+
+源内容：
+${content.substring(0, 3000)} ${content.length > 3000 ? '...(内容已截断)' : ''}
+
+要求：
+1. 提取的主题要有差异性，覆盖不同角度
+2. 每个脚本要适合口播，语言要口语化、接地气
+3. 开头必须有强钩子，能在3秒内吸引观众
+4. 结构：钩子→故事/观点→转折→结论
+5. 多用短句，避免长难句
+6. 每个脚本控制在${wordCount}字
+7. 适合在抖音、小红书等平台发布
 
 源内容：
 ${content.substring(0, 3000)} ${content.length > 3000 ? '...(内容已截断)' : ''}
