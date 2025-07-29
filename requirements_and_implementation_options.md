@@ -112,3 +112,26 @@ Results page with scripts
 **Cons:**
 - Less familiar to users
 - Limited automation
+
+---
+
+### Option 6: Feishu Open Platform + Cloud Functions
+**Pros:**
+- Native automation via Feishu Open Platform bots
+- Direct integration with Tencent/Ali cloud functions
+- No ICP license needed (hosted within Feishu)
+- Free tier available
+
+**Implementation:**
+```
+User submits via Feishu form
+↓
+Feishu bot triggers Tencent Cloud Function 
+↓
+AI processing (Baidu ERNIE API)
+↓
+Results auto-posted to Feishu doc/chat
+```
+
+**Time to MVP:** 2-3 days  
+**Confirmation:** Yes, Feishu supports custom scripting through its Open Platform SDK
