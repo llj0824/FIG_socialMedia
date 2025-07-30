@@ -86,10 +86,22 @@ Based on the example files, here's what to put in each column:
 
 ## Step 7: Process Your Entry
 
-1. Click on the row you just added (click the row number)
-2. Go to **🎬 Script Generator → ▶️ Process Selected Row**
-3. Watch Column E - it will show "Processing..." then "Completed"
-4. Check the "Results" tab for your generated script
+### Option A: Use the Form (Recommended)
+1. Go to **🎬 Script Generator → 📝 New Article Form**
+2. Fill out the form:
+   - Paste your article
+   - Adjust the system prompt (or use presets)
+   - Select number of scripts, word count, style
+   - Add any special instructions
+3. Click "Generate Scripts"
+4. The form will automatically add a row and process it
+
+### Option B: Manual Row Entry
+1. Add your data manually to the Input sheet
+2. Click on the row you just added (click the row number)
+3. Go to **🎬 Script Generator → ▶️ Process Selected Row**
+4. Watch Column E - it will show "Processing..." then "Completed"
+5. Check the "Results" tab for your generated script
 
 ### What You'll See in Results Sheet:
 

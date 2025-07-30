@@ -14,10 +14,12 @@ Input Sheet (Article + Prompts) → Apps Script → DeepSeek API → Results She
 
 ## Features
 
+- **Easy Form Interface**: Built-in form with presets and guidance
 - **Direct Prompt Control**: Expose system and user prompts as columns
-- **Simple Interface**: Direct Google Sheets editing
+- **Simple Interface**: Form-based or direct Google Sheets editing
 - **Secure API Key**: Stored in script properties, not in sheets
-- **Flexible Processing**: Process single rows or batch
+- **Flexible Processing**: Process via form or manually select rows
+- **Style Presets**: Viral, Educational, Story-based templates
 - **Cost-Effective**: ~$0.001 per script generation
 
 ## Quick Start
