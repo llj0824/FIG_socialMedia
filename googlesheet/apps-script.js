@@ -10,10 +10,31 @@ const CONFIG = {
     RESULTS: 'Results',
     REFERENCE_MATERIAL: 'Reference Material'
   },
-  API: {
-    DEEPSEEK_ENDPOINT: 'https://api.deepseek.com/v1/chat/completions',
-    MODEL: 'deepseek-reasoner',
-    TEMPERATURE: 0.7
+  TEMPERATURE: 0.7,
+  DEFAULT_PROVIDER: 'openrouter',
+  DEFAULT_MODEL: 'deepseek/deepseek-r1-0528:free'
+};
+
+// Provider configurations
+const PROVIDERS = {
+  openrouter: {
+    name: 'OpenRouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    models: [
+      { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek Reasoning' },
+      { id: 'deepseek/deepseek-chat-v3-0324:free', name: 'DeepSeek Chat' },
+      { id: 'z-ai/glm-4.5', name: 'GLM-4.5' },
+      { id: 'moonshotai/kimi-k2', name: 'Kimi K2' },
+      { id: 'qwen/qwen3-235b-a22b-2507', name: 'Qwen3 235B' },
+      { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro' }
+    ],
+    headers: (apiKey) => ({
+      'Authorization': 'Bearer ' + apiKey,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://docs.google.com', // Site URL for OpenRouter
+      'X-Title': 'FIG Script Generator' // Site name for OpenRouter
+    }),
+    apiKeyProperty: 'OPENROUTER_API_KEY'
   }
 };
 
@@ -29,11 +50,8 @@ function onOpen() {
     .addItem('📤 Upload Reference Material', 'showReferenceMaterialForm')
     .addSeparator()
     .addItem('🔧 Initialize Sheets', 'initializeSheets')
-    .addItem('🔑 Set DeepSeek API Key', 'setApiKey')
+    .addItem('🔑 Set OpenRouter API Key', 'setOpenRouterApiKey')
     .addToUi();
-  
-  // Auto-initialize sheets if they don't exist
-  initializeSheets(false);
 }
 
 /**
@@ -51,13 +69,15 @@ function initializeSheets(showAlert = true) {
       'Article Content',
       'System Prompt',
       'User Prompt',
+      'Provider',
+      'Model',
       'Status',
       'Completed At',
       'Knowledge Base Refs'
     ]);
     
     // Format headers
-    const headerRange = inputSheet.getRange(1, 1, 1, 7);
+    const headerRange = inputSheet.getRange(1, 1, 1, 9);
     headerRange.setFontWeight('bold');
     headerRange.setBackground('#4285f4');
     headerRange.setFontColor('#ffffff');
@@ -67,9 +87,11 @@ function initializeSheets(showAlert = true) {
     inputSheet.setColumnWidth(2, 400); // Article Content
     inputSheet.setColumnWidth(3, 300); // System Prompt
     inputSheet.setColumnWidth(4, 300); // User Prompt
-    inputSheet.setColumnWidth(5, 100); // Status
-    inputSheet.setColumnWidth(6, 150); // Completed At
-    inputSheet.setColumnWidth(7, 150); // Knowledge Base Refs
+    inputSheet.setColumnWidth(5, 100); // Provider
+    inputSheet.setColumnWidth(6, 150); // Model
+    inputSheet.setColumnWidth(7, 100); // Status
+    inputSheet.setColumnWidth(8, 150); // Completed At
+    inputSheet.setColumnWidth(9, 150); // Knowledge Base Refs
   }
   
   // Initialize Results sheet with enhanced columns
@@ -206,23 +228,32 @@ function processRow(row) {
   const articleContent = inputSheet.getRange(row, 2).getValue();
   const systemPrompt = inputSheet.getRange(row, 3).getValue();
   const userPrompt = inputSheet.getRange(row, 4).getValue();
+  const provider = inputSheet.getRange(row, 5).getValue() || CONFIG.DEFAULT_PROVIDER;
+  const model = inputSheet.getRange(row, 6).getValue() || CONFIG.DEFAULT_MODEL;
   
   // Validation
   if (!articleContent) {
-    inputSheet.getRange(row, 5).setValue('Error: No article content');
+    inputSheet.getRange(row, 7).setValue('Error: No article content');
     return;
   }
   
   // Update status
-  inputSheet.getRange(row, 5).setValue('Processing...');
+  inputSheet.getRange(row, 7).setValue('Processing...');
   SpreadsheetApp.flush();
+  
+  // Get provider configuration
+  const providerConfig = PROVIDERS[provider];
+  if (!providerConfig) {
+    inputSheet.getRange(row, 7).setValue('Error: Invalid provider');
+    return;
+  }
   
   // Get API key from script properties
   const scriptProperties = PropertiesService.getScriptProperties();
-  const apiKey = scriptProperties.getProperty('DEEPSEEK_API_KEY');
+  const apiKey = scriptProperties.getProperty(providerConfig.apiKeyProperty);
   
   if (!apiKey) {
-    inputSheet.getRange(row, 5).setValue('Error: No API key set. Use menu to set key.');
+    inputSheet.getRange(row, 7).setValue(`Error: No ${providerConfig.name} API key set.`);
     return;
   }
   
@@ -232,8 +263,10 @@ function processRow(row) {
       ? `${userPrompt}\n\n文章内容：\n${articleContent}`
       : `请根据以下文章生成短视频脚本：\n\n${articleContent}`;
     
-    // Call DeepSeek API
-    const apiResult = callDeepSeek(
+    // Call LLM API
+    const apiResult = callLLM(
+      provider,
+      model,
       systemPrompt || 'You are an expert short video script writer. Generate engaging scripts in Chinese.',
       fullUserPrompt,
       apiKey
@@ -250,28 +283,33 @@ function processRow(row) {
       userPrompt || 'Default',   // User Prompt Used
       JSON.stringify(apiResult.payload, null, 2), // Full LLM Payload (formatted)
       JSON.stringify(apiResult.response.usage || {}), // Token Usage Info
-      apiResult.response.model || CONFIG.API.MODEL, // Model Used
+      apiResult.response.model || model, // Model Used
       new Date() // Processing Timestamp
     ]);
     
     // Update status
-    inputSheet.getRange(row, 5).setValue('Completed');
-    inputSheet.getRange(row, 6).setValue(new Date());
+    inputSheet.getRange(row, 7).setValue('Completed');
+    inputSheet.getRange(row, 8).setValue(new Date());
     
   } catch (error) {
     console.error('Processing error:', error);
-    inputSheet.getRange(row, 5).setValue('Error: ' + error.toString());
+    inputSheet.getRange(row, 7).setValue('Error: ' + error.toString());
   }
 }
 
 
 /**
- * Call DeepSeek API
+ * Call LLM API (supports multiple providers)
  * Returns both the response content and the full payload for transparency
  */
-function callDeepSeek(systemPrompt, userPrompt, apiKey) {
+function callLLM(provider, model, systemPrompt, userPrompt, apiKey) {
+  const providerConfig = PROVIDERS[provider];
+  if (!providerConfig) {
+    throw new Error('Invalid provider: ' + provider);
+  }
+  
   const payload = {
-    model: CONFIG.API.MODEL,
+    model: model,
     messages: [
       {
         role: 'system',
@@ -282,16 +320,13 @@ function callDeepSeek(systemPrompt, userPrompt, apiKey) {
         content: userPrompt
       }
     ],
-    temperature: CONFIG.API.TEMPERATURE,
+    temperature: CONFIG.TEMPERATURE,
     max_tokens: 4000
   };
   
-  const response = UrlFetchApp.fetch(CONFIG.API.DEEPSEEK_ENDPOINT, {
+  const response = UrlFetchApp.fetch(providerConfig.endpoint, {
     method: 'post',
-    headers: {
-      'Authorization': 'Bearer ' + apiKey,
-      'Content-Type': 'application/json'
-    },
+    headers: providerConfig.headers(apiKey),
     payload: JSON.stringify(payload)
   });
   
@@ -339,6 +374,8 @@ function processArticleForm(formData) {
       formData.articleContent,        // Article Content
       systemPrompt,                   // System Prompt (generated from styles)
       userPrompt,                     // User Prompt (includes knowledge base content)
+      formData.provider || CONFIG.DEFAULT_PROVIDER,  // Provider
+      formData.model || CONFIG.DEFAULT_MODEL,        // Model
       'Processing...',                // Status
       '',                            // Completed At
       formData.referenceIds ? formData.referenceIds.join(', ') : '' // Reference Material IDs
@@ -489,6 +526,26 @@ function getReferenceMaterialItems() {
   return data.slice(1).map(row => [row[0], row[1], row[3]]); // [ID, Title, Purpose]
 }
 
+/**
+ * Get available models for form dropdown
+ */
+function getAvailableModels() {
+  const models = [];
+  Object.keys(PROVIDERS).forEach(providerId => {
+    const provider = PROVIDERS[providerId];
+    provider.models.forEach(model => {
+      models.push({
+        providerId: providerId,
+        providerName: provider.name,
+        modelId: model.id,
+        modelName: model.name,
+        display: `${provider.name}: ${model.name}`
+      });
+    });
+  });
+  return models;
+}
+
 function getArticleFormHtml() {
   return `<!DOCTYPE html>
 <html>
@@ -616,6 +673,14 @@ function getArticleFormHtml() {
     </div>
 
     <div class="form-group">
+      <label for="model">AI Model</label>
+      <select id="model" name="model" required>
+        <!-- Options will be populated dynamically -->
+      </select>
+      <div class="help-text">Select the AI model to use for generation</div>
+    </div>
+
+    <div class="form-group">
       <label for="scriptStyles">Script Styles (Select Multiple)</label>
       <select id="scriptStyles" name="scriptStyles" multiple style="height: 150px">
         <option value="viral">Viral Content (病毒式传播)</option>
@@ -678,13 +743,21 @@ function getArticleFormHtml() {
     const styleOptions = document.getElementById('scriptStyles').selectedOptions;
     const scriptStyles = Array.from(styleOptions).map(opt => opt.value);
     
+    // Get selected model
+    const modelSelect = document.getElementById('model');
+    const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+    const provider = selectedOption.getAttribute('data-provider');
+    const model = selectedOption.value;
+    
     const formData = {
       articleContent: document.getElementById('articleContent').value,
       scriptStyles: scriptStyles,
       scriptCount: document.getElementById('scriptCount').value,
       wordCount: document.getElementById('wordCount').value,
       additionalInstructions: document.getElementById('additionalInstructions').value,
-      referenceIds: referenceIds
+      referenceIds: referenceIds,
+      provider: provider,
+      model: model
     };
       
       // Call server function
@@ -714,6 +787,7 @@ function getArticleFormHtml() {
   <script>
     // Populate reference material options on load
     document.addEventListener('DOMContentLoaded', function() {
+      // Populate reference materials
       google.script.run
         .withSuccessHandler(function(items) {
           const select = document.getElementById('referenceIds');
@@ -728,6 +802,27 @@ function getArticleFormHtml() {
           });
         })
         .getReferenceMaterialItems();
+        
+      // Populate models
+      google.script.run
+        .withSuccessHandler(function(models) {
+          const select = document.getElementById('model');
+          let defaultSet = false;
+          models.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.modelId;
+            option.setAttribute('data-provider', model.providerId);
+            option.textContent = model.display;
+            select.appendChild(option);
+            
+            // Set default to DeepSeek Reasoning
+            if (model.modelId === 'deepseek/deepseek-r1-0528:free' && !defaultSet) {
+              option.selected = true;
+              defaultSet = true;
+            }
+          });
+        })
+        .getAvailableModels();
     });
   </script>
 </body>
@@ -735,13 +830,13 @@ function getArticleFormHtml() {
 }
 
 /**
- * Set API Key through UI prompt
+ * Set OpenRouter API Key through UI prompt
  */
-function setApiKey() {
+function setOpenRouterApiKey() {
   const ui = SpreadsheetApp.getUi();
   const result = ui.prompt(
-    '🔑 Set DeepSeek API Key',
-    'Enter your DeepSeek API key:',
+    '🔑 Set OpenRouter API Key',
+    'Enter your OpenRouter API key (get one at openrouter.ai):',
     ui.ButtonSet.OK_CANCEL
   );
   
@@ -749,8 +844,8 @@ function setApiKey() {
     const apiKey = result.getResponseText().trim();
     if (apiKey) {
       const scriptProperties = PropertiesService.getScriptProperties();
-      scriptProperties.setProperty('DEEPSEEK_API_KEY', apiKey);
-      ui.alert('✅ API Key saved successfully!');
+      scriptProperties.setProperty('OPENROUTER_API_KEY', apiKey);
+      ui.alert('✅ OpenRouter API Key saved successfully!');
     } else {
       ui.alert('❌ Please enter a valid API key.');
     }
