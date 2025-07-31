@@ -8,11 +8,13 @@ const CONFIG = {
   SHEETS: {
     INPUT: 'Input',
     RESULTS: 'Results',
-    REFERENCE_MATERIAL: 'Reference Material'
+    REFERENCE_MATERIAL: 'Reference Material',
+    SYSTEM_PROMPTS: 'System Prompts'
   },
   TEMPERATURE: 0.7,
   DEFAULT_PROVIDER: 'openrouter',
-  DEFAULT_MODEL: 'deepseek/deepseek-r1-0528:free'
+  DEFAULT_MODEL: 'deepseek/deepseek-r1-0528:free',
+  DEFAULT_PROMPT_ID: 'viral-specialist'
 };
 
 // Provider configurations
@@ -48,6 +50,7 @@ function onOpen() {
     .addItem('📝 Generate New Script', 'showArticleForm')
     .addItem('▶️ Generate Scripts From Input Row', 'processSelectedRow')
     .addItem('📤 Upload Reference Material', 'showReferenceMaterialForm')
+    .addItem('🤖 Manage System Prompts', 'showSystemPromptsForm')
     .addSeparator()
     .addItem('🔧 Initialize Sheets', 'initializeSheets')
     .addItem('🔑 Set OpenRouter API Key', 'setOpenRouterApiKey')
@@ -193,9 +196,203 @@ function initializeSheets(showAlert = true) {
     ]);
   }
   
+  // Initialize System Prompts sheet
+  let promptsSheet = spreadsheet.getSheetByName(CONFIG.SHEETS.SYSTEM_PROMPTS);
+  if (!promptsSheet) {
+    promptsSheet = spreadsheet.insertSheet(CONFIG.SHEETS.SYSTEM_PROMPTS);
+    promptsSheet.appendRow([
+      'ID',
+      'Name',
+      'Description',
+      'Prompt Content',
+      'Is Active',
+      'Is Default',
+      'Created Date',
+      'Last Modified'
+    ]);
+    
+    // Format headers
+    const headerRange = promptsSheet.getRange(1, 1, 1, 8);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#9900ff');
+    headerRange.setFontColor('#ffffff');
+    
+    // Set column widths
+    promptsSheet.setColumnWidth(1, 120); // ID
+    promptsSheet.setColumnWidth(2, 200); // Name
+    promptsSheet.setColumnWidth(3, 300); // Description
+    promptsSheet.setColumnWidth(4, 600); // Prompt Content
+    promptsSheet.setColumnWidth(5, 80);  // Is Active
+    promptsSheet.setColumnWidth(6, 80);  // Is Default
+    promptsSheet.setColumnWidth(7, 150); // Created Date
+    promptsSheet.setColumnWidth(8, 150); // Last Modified
+    
+    // Add default system prompts
+    initializeDefaultPrompts(promptsSheet);
+  }
+  
   if (showAlert) {
     SpreadsheetApp.getUi().alert('✅ Sheets initialized successfully!');
   }
+}
+
+/**
+ * Initialize default system prompts
+ */
+function initializeDefaultPrompts(sheet) {
+  const now = new Date();
+  
+  const defaultPrompts = [
+    {
+      id: 'viral-specialist',
+      name: '爆款专家',
+      description: '专门研究病毒式传播，深谙算法和用户心理',
+      content: `你是专门研究病毒式传播的短视频内容专家，深谙各大平台算法和用户心理。你的核心任务是将任何内容改编成具有爆款潜质的短视频脚本。
+
+【爆款公式】
+1. 开头钩子（0-3秒）：疑问句/冲突点/惊人结果/情绪共鸣
+2. 内容展开（4-40秒）：层层递进，信息密度高，每句话都有价值
+3. 情绪高潮（40-50秒）：观点输出/态度表达/价值升华
+4. 结尾引导（50-60秒）：引发讨论/行动号召/悬念预告
+
+【创作技巧】
+- 标题党但不低俗：用好奇心驱动但内容要对得起标题
+- 制造讨论点：适度的争议性让评论区活跃
+- 数据化表达：用具体数字增强说服力
+- 场景化描述：让观众有画面感和代入感
+- 押韵和排比：增强语言节奏感和记忆点
+
+【内容价值】
+每个脚本必须提供至少一种价值：
+- 知识增量（学到了）
+- 情绪共鸣（太真实了）
+- 娱乐消遣（笑死了）
+- 实用技巧（马上用）`,
+      isActive: true,
+      isDefault: true
+    },
+    {
+      id: 'storyteller',
+      name: '故事大师',
+      description: '擅长叙事，能从平凡中发现不平凡',
+      content: `你是中国最会讲故事的短视频编剧，被称为"情绪价值制造机"。你的特长是：
+
+【叙事能力】
+- 从平淡素材中挖掘戏剧性，让每个故事都有起承转合
+- 善用悬念、反转、对比等叙事技巧
+- 把复杂信息编织成引人入胜的故事线
+
+【情绪把控】
+- 精准拿捏观众心理，知道什么内容能触动人心
+- 制造"爽点"：让观众感到解气、感动、惊喜
+- 营造代入感：用"咱们""兄弟们"等称呼拉近距离
+
+【表达技巧】
+- 金句频出，每个脚本至少3个可传播的金句
+- 类比生动，把难懂的道理说得通俗易懂
+- 节奏紧凑，删除所有不必要的废话
+
+记住：好的短视频脚本要让人看了就想分享给朋友。`,
+      isActive: true,
+      isDefault: false
+    },
+    {
+      id: 'educator',
+      name: '知识博主',
+      description: '擅长科普，让复杂知识变简单',
+      content: `你是知识类短视频的顶级创作者，擅长把深度内容转化为通俗易懂的短视频脚本。你的使命是"让知识看得见，让价值传得远"。
+
+【内容策略】
+- 知识点拆解：把复杂概念分解成3-5个易理解的要点
+- 案例教学：每个观点配1-2个生活化案例
+- 类比说明：用熟悉的事物解释陌生概念
+- 实用导向：告诉观众"这个知识能帮你解决什么问题"
+
+【表达方式】
+- 去学术化：避免专业术语，用大白话讲清楚
+- 场景代入："你有没有遇到过...""很多人不知道..."
+- 互动设计："你们猜怎么着""评论区告诉我"
+- 记忆锚点：总结成顺口溜、数字公式等易记形式
+
+【脚本结构】
+1. 问题引入：提出观众关心的问题
+2. 核心观点：一句话说清楚答案
+3. 论证展开：用故事、数据、案例支撑
+4. 价值总结：这个知识点的实际应用
+5. 行动建议：观众看完能立即做什么`,
+      isActive: true,
+      isDefault: false
+    },
+    {
+      id: 'humor-master',
+      name: '段子手',
+      description: '幽默风趣，让内容轻松有趣',
+      content: `你是短视频界的"梗王"，擅长用幽默的方式呈现内容，让观众在轻松愉快中获得价值。
+
+【幽默技巧】
+- 反差萌：严肃话题轻松讲，轻松话题深度讲
+- 自嘲式：适度自黑拉近距离
+- 谐音梗：巧用谐音制造笑点（但不要太尬）
+- 夸张手法：适度夸大但不失真
+
+【语言风格】
+- 网感十足：熟悉当下流行梗和网络用语
+- 节奏明快：像说相声一样有铺垫有包袱
+- 反转频繁：每20秒一个小反转
+- 互动性强：假装和观众对话
+
+【内容原则】
+- 有趣但不低俗
+- 搞笑但有营养
+- 轻松但不敷衍
+- 娱乐但有态度
+
+记住：让观众笑着笑着就学到了东西，这是最高境界。`,
+      isActive: true,
+      isDefault: false
+    },
+    {
+      id: 'emotion-expert',
+      name: '情感专家',
+      description: '擅长情绪渲染，引发强烈共鸣',
+      content: `你是短视频情感内容的专家，擅长触动人心最柔软的地方，让观众产生强烈的情感共鸣。
+
+【情感技巧】
+- 细节打动：用具体细节而非空洞说教
+- 真实感：分享真实经历或"朋友的故事"
+- 情绪递进：从平静到高潮的情绪曲线
+- 共鸣点：戳中大多数人的痛点或爽点
+
+【表达方式】
+- 第一人称：增强代入感和真实性
+- 画面感：让观众脑海中有画面
+- 情绪词汇：准确使用情绪描述词
+- 留白艺术：关键时刻的停顿更有力量
+
+【内容方向】
+- 亲情：父母、子女、手足之情
+- 友情：青春、陪伴、背叛与和解
+- 爱情：暗恋、热恋、分手、遗憾
+- 人生：梦想、坚持、放弃、重新开始
+
+记住：真诚是最大的技巧，让观众感受到你的真心。`,
+      isActive: true,
+      isDefault: false
+    }
+  ];
+  
+  defaultPrompts.forEach(prompt => {
+    sheet.appendRow([
+      prompt.id,
+      prompt.name,
+      prompt.description,
+      prompt.content,
+      prompt.isActive,
+      prompt.isDefault,
+      now,
+      now
+    ]);
+  });
 }
 
 /**
@@ -276,7 +473,7 @@ function processRow(row) {
     resultsSheet.appendRow([
       row,                    // Source Row
       timestamp,              // Timestamp
-      articleContent.substring(0, 100) + '...', // Article Preview
+      articleContent.substring(0, 300) + '...', // Article Preview
       apiResult.content,      // Generated Script
       apiResult.content.length, // Character Count
       systemPrompt || 'Default', // System Prompt Used
@@ -361,8 +558,12 @@ function processArticleForm(formData) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet();
     const inputSheet = sheet.getSheetByName(CONFIG.SHEETS.INPUT);
     
-    // Build system prompt based on selected styles
-    const systemPrompt = buildSystemPromptFromStyles(formData.scriptStyles);
+    // Get system prompt from selected template
+    const promptTemplate = getSystemPromptById(formData.promptTemplateId);
+    if (!promptTemplate) {
+      throw new Error('Invalid prompt template selected');
+    }
+    const systemPrompt = promptTemplate.content;
     
     // Build user prompt from form data
     const userPrompt = buildUserPromptFromForm(formData);
@@ -372,7 +573,7 @@ function processArticleForm(formData) {
     const newRow = [
       timestamp,                      // Timestamp
       formData.articleContent,        // Article Content
-      systemPrompt,                   // System Prompt (generated from styles)
+      systemPrompt,                   // System Prompt (from template)
       userPrompt,                     // User Prompt (includes knowledge base content)
       formData.provider || CONFIG.DEFAULT_PROVIDER,  // Provider
       formData.model || CONFIG.DEFAULT_MODEL,        // Model
@@ -400,66 +601,14 @@ function processArticleForm(formData) {
   }
 }
 
-/**
- * Build system prompt from selected styles
- */
-function buildSystemPromptFromStyles(scriptStyles) {
-  // Base system prompt
-  let systemPrompt = '你是一个短视频脚本创作专家，擅长将长文章改编成多个有吸引力的短视频脚本。';
-  
-  // Style-specific attributes
-  const styleAttributes = {
-    viral: '你特别擅长创作病毒式传播的内容，知道如何抓住热点和争议性话题。',
-    educational: '你善于将复杂知识简化，用通俗易懂的方式传播有价值的信息。',
-    story: '你是讲故事的高手，能从平凡中发现不平凡，创造引人入胜的叙事。',
-    conversational: '你的语言风格亲切自然，像朋友聊天一样让人感到舒适。',
-    professional: '你注重内容的准确性和权威性，用专业的态度对待每个话题。',
-    emotional: '你善于触动人心，能够准确把握和调动观众的情绪。',
-    humorous: '你有幽默感，能够用轻松有趣的方式呈现内容。'
-  };
-  
-  // Add attributes based on selected styles
-  if (scriptStyles && scriptStyles.length > 0) {
-    scriptStyles.forEach(style => {
-      if (styleAttributes[style]) {
-        systemPrompt += styleAttributes[style];
-      }
-    });
-  }
-  
-  // Add common requirements
-  systemPrompt += '每个脚本都要有强烈的开头钩子，适合口播，能在短时间内吸引并保持观众注意力。';
-  
-  return systemPrompt;
-}
 
 /**
  * Build user prompt from form data
  */
 function buildUserPromptFromForm(formData) {
-  // Comprehensive style mapping including both content type and tone
-  const styleMap = {
-    viral: '病毒式传播内容 - 注重强钩子、情绪点和争议性话题，让人看了想评论或分享',
-    educational: '知识类内容 - 把复杂概念讲解得通俗易懂，用生动的例子和类比',
-    story: '故事型内容 - 从普通内容中提取精彩故事，有起承转合、悬念和反转',
-    conversational: '口语化表达 - 使用"兄弟"、"朋友们"等称呼，拉近距离',
-    professional: '专业严谨 - 使用专业语言，有理有据，适合知识分享',
-    emotional: '情绪化 - 注重情绪渲染，引起观众共鸣',
-    humorous: '幽默风趣 - 加入幽默元素，让内容轻松有趣'
-  };
-  
   let prompt = `请根据文章内容生成${formData.scriptCount}个短视频脚本。\n\n`;
   prompt += `要求：\n`;
   prompt += `- 每个脚本${formData.wordCount}字\n`;
-  
-  // Handle multiple selected styles
-  if (formData.scriptStyles && formData.scriptStyles.length > 0) {
-    prompt += `- 风格要求：\n`;
-    formData.scriptStyles.forEach(style => {
-      prompt += `  • ${styleMap[style]}\n`;
-    });
-  }
-  
   prompt += `- 每个脚本要有不同的角度和侧重点\n`;
   prompt += `- 开头必须有强钩子，3秒内吸引注意力\n`;
   
@@ -524,6 +673,49 @@ function getReferenceMaterialItems() {
   const data = sheet.getDataRange().getValues();
   // Skip header row
   return data.slice(1).map(row => [row[0], row[1], row[3]]); // [ID, Title, Purpose]
+}
+
+/**
+ * Get active system prompts for form dropdown
+ */
+function getActiveSystemPrompts() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.SYSTEM_PROMPTS);
+  if (!sheet) return [];
+  
+  const data = sheet.getDataRange().getValues();
+  // Skip header row and filter for active prompts
+  return data.slice(1)
+    .filter(row => row[4] === true) // Is Active
+    .map(row => ({
+      id: row[0],
+      name: row[1],
+      description: row[2],
+      isDefault: row[5]
+    }));
+}
+
+/**
+ * Get system prompt by ID
+ */
+function getSystemPromptById(promptId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.SYSTEM_PROMPTS);
+  if (!sheet) return null;
+  
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === promptId) {
+      return {
+        id: data[i][0],
+        name: data[i][1],
+        description: data[i][2],
+        content: data[i][3],
+        isActive: data[i][4],
+        isDefault: data[i][5]
+      };
+    }
+  }
+  
+  return null;
 }
 
 /**
@@ -681,17 +873,11 @@ function getArticleFormHtml() {
     </div>
 
     <div class="form-group">
-      <label for="scriptStyles">Script Styles (Select Multiple)</label>
-      <select id="scriptStyles" name="scriptStyles" multiple style="height: 150px">
-        <option value="viral">Viral Content (病毒式传播)</option>
-        <option value="educational">Educational (知识类)</option>
-        <option value="story">Story-based (故事型)</option>
-        <option value="conversational">Conversational (口语化)</option>
-        <option value="professional">Professional (专业严谨)</option>
-        <option value="emotional">Emotional (情绪化)</option>
-        <option value="humorous">Humorous (幽默风趣)</option>
+      <label for="promptTemplate">Script Style Template</label>
+      <select id="promptTemplate" name="promptTemplate" required>
+        <!-- Options will be populated dynamically -->
       </select>
-      <div class="help-text">Select one or more styles (hold Ctrl/Cmd to multi-select)</div>
+      <div class="help-text">Select the writing style for your scripts</div>
     </div>
 
     <div class="form-group">
@@ -739,9 +925,8 @@ function getArticleFormHtml() {
     const referenceOptions = document.getElementById('referenceIds').selectedOptions;
     const referenceIds = Array.from(referenceOptions).map(opt => opt.value);
     
-    // Get selected script styles
-    const styleOptions = document.getElementById('scriptStyles').selectedOptions;
-    const scriptStyles = Array.from(styleOptions).map(opt => opt.value);
+    // Get selected prompt template
+    const promptTemplateId = document.getElementById('promptTemplate').value;
     
     // Get selected model
     const modelSelect = document.getElementById('model');
@@ -751,7 +936,7 @@ function getArticleFormHtml() {
     
     const formData = {
       articleContent: document.getElementById('articleContent').value,
-      scriptStyles: scriptStyles,
+      promptTemplateId: promptTemplateId,
       scriptCount: document.getElementById('scriptCount').value,
       wordCount: document.getElementById('wordCount').value,
       additionalInstructions: document.getElementById('additionalInstructions').value,
@@ -823,6 +1008,22 @@ function getArticleFormHtml() {
           });
         })
         .getAvailableModels();
+        
+      // Populate prompt templates
+      google.script.run
+        .withSuccessHandler(function(prompts) {
+          const select = document.getElementById('promptTemplate');
+          prompts.forEach(prompt => {
+            const option = document.createElement('option');
+            option.value = prompt.id;
+            option.textContent = prompt.name + ' - ' + prompt.description;
+            if (prompt.isDefault) {
+              option.selected = true;
+            }
+            select.appendChild(option);
+          });
+        })
+        .getActiveSystemPrompts();
     });
   </script>
 </body>
