@@ -7,7 +7,8 @@
 const CONFIG = {
   SHEETS: {
     INPUT: 'Input',
-    RESULTS: 'Results'
+    RESULTS: 'Results',
+    KNOWLEDGE_BASE: 'knowledge_base'
   },
   API: {
     DEEPSEEK_ENDPOINT: 'https://api.deepseek.com/v1/chat/completions',
@@ -25,7 +26,158 @@ function onOpen() {
   ui.createMenu('🎬 Script Generator')
     .addItem('📝 New Article Form', 'showArticleForm')
     .addItem('▶️ Process Selected Row', 'processSelectedRow')
+    .addSeparator()
+    .addItem('🔧 Initialize Sheets', 'initializeSheets')
+    .addItem('🔑 Set DeepSeek API Key', 'setApiKey')
     .addToUi();
+  
+  // Auto-initialize sheets if they don't exist
+  initializeSheets(false);
+}
+
+/**
+ * Initialize sheets with proper structure
+ */
+function initializeSheets(showAlert = true) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Initialize Input sheet
+  let inputSheet = spreadsheet.getSheetByName(CONFIG.SHEETS.INPUT);
+  if (!inputSheet) {
+    inputSheet = spreadsheet.insertSheet(CONFIG.SHEETS.INPUT);
+    inputSheet.appendRow([
+      'Timestamp',
+      'Article Content',
+      'System Prompt',
+      'User Prompt',
+      'Status',
+      'Completed At',
+      'Knowledge Base Refs'
+    ]);
+    
+    // Format headers
+    const headerRange = inputSheet.getRange(1, 1, 1, 7);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#4285f4');
+    headerRange.setFontColor('#ffffff');
+    
+    // Set column widths
+    inputSheet.setColumnWidth(1, 150); // Timestamp
+    inputSheet.setColumnWidth(2, 400); // Article Content
+    inputSheet.setColumnWidth(3, 300); // System Prompt
+    inputSheet.setColumnWidth(4, 300); // User Prompt
+    inputSheet.setColumnWidth(5, 100); // Status
+    inputSheet.setColumnWidth(6, 150); // Completed At
+    inputSheet.setColumnWidth(7, 150); // Knowledge Base Refs
+  }
+  
+  // Initialize Results sheet with enhanced columns
+  let resultsSheet = spreadsheet.getSheetByName(CONFIG.SHEETS.RESULTS);
+  if (!resultsSheet) {
+    resultsSheet = spreadsheet.insertSheet(CONFIG.SHEETS.RESULTS);
+  }
+  
+  // Clear and reset Results sheet headers for enhanced transparency
+  if (resultsSheet.getLastRow() === 0 || showAlert) {
+    resultsSheet.clear();
+    resultsSheet.appendRow([
+      'Source Row',
+      'Timestamp',
+      'Article Preview',
+      'Generated Script',
+      'Character Count',
+      'System Prompt Used',
+      'User Prompt Used',
+      'Full LLM Payload',
+      'Token Usage',
+      'Model Used',
+      'Processing Time'
+    ]);
+    
+    // Format headers
+    const headerRange = resultsSheet.getRange(1, 1, 1, 11);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#34a853');
+    headerRange.setFontColor('#ffffff');
+    
+    // Set column widths
+    resultsSheet.setColumnWidth(1, 80);  // Source Row
+    resultsSheet.setColumnWidth(2, 150); // Timestamp
+    resultsSheet.setColumnWidth(3, 200); // Article Preview
+    resultsSheet.setColumnWidth(4, 400); // Generated Script
+    resultsSheet.setColumnWidth(5, 120); // Character Count
+    resultsSheet.setColumnWidth(6, 200); // System Prompt
+    resultsSheet.setColumnWidth(7, 200); // User Prompt
+    resultsSheet.setColumnWidth(8, 500); // Full Payload
+    resultsSheet.setColumnWidth(9, 150); // Token Usage
+    resultsSheet.setColumnWidth(10, 150); // Model Used
+    resultsSheet.setColumnWidth(11, 150); // Processing Time
+  }
+  
+  // Initialize Knowledge Base sheet
+  let kbSheet = spreadsheet.getSheetByName(CONFIG.SHEETS.KNOWLEDGE_BASE);
+  if (!kbSheet) {
+    kbSheet = spreadsheet.insertSheet(CONFIG.SHEETS.KNOWLEDGE_BASE);
+    kbSheet.appendRow([
+      'ID',
+      'Title',
+      'Content',
+      'Category',
+      'Tags',
+      'Created Date',
+      'Last Updated'
+    ]);
+    
+    // Format headers
+    const headerRange = kbSheet.getRange(1, 1, 1, 7);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#fbbc04');
+    headerRange.setFontColor('#000000');
+    
+    // Set column widths
+    kbSheet.setColumnWidth(1, 80);  // ID
+    kbSheet.setColumnWidth(2, 200); // Title
+    kbSheet.setColumnWidth(3, 500); // Content
+    kbSheet.setColumnWidth(4, 150); // Category
+    kbSheet.setColumnWidth(5, 200); // Tags
+    kbSheet.setColumnWidth(6, 150); // Created Date
+    kbSheet.setColumnWidth(7, 150); // Last Updated
+    
+    // Add sample knowledge base entries
+    kbSheet.appendRow([
+      'KB001',
+      '短视频开头钩子技巧',
+      '1. 疑问式开头：直接抛出观众关心的问题\n2. 冲突式开头：展示矛盾或争议性观点\n3. 结果前置：先展示惊人结果再讲过程\n4. 情绪共鸣：用情绪化语言引起共鸣',
+      'Script Writing',
+      'hooks, opening, engagement',
+      new Date(),
+      new Date()
+    ]);
+    
+    kbSheet.appendRow([
+      'KB002',
+      '口播视频节奏控制',
+      '1. 每句话控制在15-20字以内\n2. 使用短句和断句增加节奏感\n3. 重要信息重复2-3次\n4. 每30秒设置一个小高潮',
+      'Script Writing',
+      'pacing, rhythm, structure',
+      new Date(),
+      new Date()
+    ]);
+    
+    kbSheet.appendRow([
+      'KB003',
+      '情绪化表达技巧',
+      '1. 使用"你"而不是"大家"\n2. 加入个人经历和故事\n3. 使用具体数字和案例\n4. 适当使用夸张和对比',
+      'Script Writing',
+      'emotion, engagement, storytelling',
+      new Date(),
+      new Date()
+    ]);
+  }
+  
+  if (showAlert) {
+    SpreadsheetApp.getUi().alert('✅ Sheets initialized successfully!');
+  }
 }
 
 /**
@@ -85,21 +237,25 @@ function processRow(row) {
       : `请根据以下文章生成短视频脚本：\n\n${articleContent}`;
     
     // Call DeepSeek API
-    const response = callDeepSeek(
+    const apiResult = callDeepSeek(
       systemPrompt || 'You are an expert short video script writer. Generate engaging scripts in Chinese.',
       fullUserPrompt,
       apiKey
     );
     
-    // Save to Results sheet
+    // Save to Results sheet with enhanced transparency
     resultsSheet.appendRow([
       row,                    // Source Row
       timestamp,              // Timestamp
       articleContent.substring(0, 100) + '...', // Article Preview
-      response,               // Generated Script
-      response.length,        // Character Count
+      apiResult.content,      // Generated Script
+      apiResult.content.length, // Character Count
       systemPrompt || 'Default', // System Prompt Used
-      userPrompt || 'Default'    // User Prompt Used
+      userPrompt || 'Default',   // User Prompt Used
+      JSON.stringify(apiResult.payload, null, 2), // Full LLM Payload (formatted)
+      JSON.stringify(apiResult.response.usage || {}), // Token Usage Info
+      apiResult.response.model || CONFIG.API.MODEL, // Model Used
+      new Date() // Processing Timestamp
     ]);
     
     // Update status
@@ -115,29 +271,32 @@ function processRow(row) {
 
 /**
  * Call DeepSeek API
+ * Returns both the response content and the full payload for transparency
  */
 function callDeepSeek(systemPrompt, userPrompt, apiKey) {
+  const payload = {
+    model: CONFIG.API.MODEL,
+    messages: [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      {
+        role: 'user',
+        content: userPrompt
+      }
+    ],
+    temperature: CONFIG.API.TEMPERATURE,
+    max_tokens: 4000
+  };
+  
   const response = UrlFetchApp.fetch(CONFIG.API.DEEPSEEK_ENDPOINT, {
     method: 'post',
     headers: {
       'Authorization': 'Bearer ' + apiKey,
       'Content-Type': 'application/json'
     },
-    payload: JSON.stringify({
-      model: CONFIG.API.MODEL,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: userPrompt
-        }
-      ],
-      temperature: CONFIG.API.TEMPERATURE,
-      max_tokens: 4000
-    })
+    payload: JSON.stringify(payload)
   });
   
   const result = JSON.parse(response.getContentText());
@@ -145,7 +304,11 @@ function callDeepSeek(systemPrompt, userPrompt, apiKey) {
     throw new Error('Invalid API response');
   }
   
-  return result.choices[0].message.content;
+  return {
+    content: result.choices[0].message.content,
+    payload: payload,
+    response: result
+  };
 }
 
 /**
@@ -170,15 +333,16 @@ function processArticleForm(formData) {
     // Build user prompt from form data
     const userPrompt = buildUserPromptFromForm(formData);
     
-    // Add new row to Input sheet
+    // Add new row to Input sheet with knowledge references
     const timestamp = new Date();
     const newRow = [
       timestamp,                      // Timestamp
       formData.articleContent,        // Article Content
       formData.systemPrompt,          // System Prompt
-      userPrompt,                     // User Prompt
+      userPrompt,                     // User Prompt (includes knowledge base content)
       'Processing...',                // Status
-      ''                             // Completed At
+      '',                            // Completed At
+      formData.knowledgeRefs ? formData.knowledgeRefs.join(', ') : '' // Knowledge Base References
     ];
     
     inputSheet.appendRow(newRow);
@@ -221,13 +385,52 @@ function buildUserPromptFromForm(formData) {
   if (formData.additionalInstructions) {
     prompt += `\n特别要求：${formData.additionalInstructions}`;
   }
+
+  if (formData.knowledgeRefs && formData.knowledgeRefs.length > 0) {
+    const kbContent = getKnowledgeContent(formData.knowledgeRefs);
+    prompt += `\n参考内容（仅供引用，不直接使用）：\n${kbContent}\n\n`;
+    prompt += `注意：上述参考内容仅作为背景知识，不要直接复制或改写。`;
+  }
   
   return prompt;
 }
 
 /**
+ * Get knowledge base content for given IDs
+ */
+function getKnowledgeContent(ids) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.KNOWLEDGE_BASE);
+  if (!sheet) return '';
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const content = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (ids.includes(row[0])) {
+      content.push(`【参考${row[0]}】${row[2]}`);
+    }
+  }
+  
+  return content.join('\n\n');
+}
+
+/**
  * Get HTML for the article form
  */
+/**
+ * Get knowledge base items for form dropdown
+ */
+function getKnowledgeBaseItems() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.KNOWLEDGE_BASE);
+  if (!sheet) return [];
+  
+  const data = sheet.getDataRange().getValues();
+  // Skip header row
+  return data.slice(1).map(row => [row[0], row[1]]); // [ID, Title]
+}
+
 function getArticleFormHtml() {
   return `<!DOCTYPE html>
 <html>
@@ -375,6 +578,14 @@ function getArticleFormHtml() {
     </div>
 
     <div class="form-group">
+      <label for="knowledgeRefs">Reference Knowledge Base</label>
+      <select id="knowledgeRefs" name="knowledgeRefs" multiple style="height: 100px">
+        <!-- Options will be populated dynamically -->
+      </select>
+      <div class="help-text">Select reference materials (hold Ctrl/Cmd to multi-select)</div>
+    </div>
+
+    <div class="form-group">
       <label for="additionalInstructions">Additional Instructions (Optional)</label>
       <textarea id="additionalInstructions" name="additionalInstructions" class="small-textarea" 
                 placeholder="E.g., Focus on specific angles, use certain examples, target audience..."></textarea>
@@ -417,14 +628,19 @@ function getArticleFormHtml() {
       status.style.display = 'block';
       
       // Gather form data
-      const formData = {
-        articleContent: document.getElementById('articleContent').value,
-        systemPrompt: document.getElementById('systemPrompt').value,
-        scriptCount: document.getElementById('scriptCount').value,
-        wordCount: document.getElementById('wordCount').value,
-        style: document.getElementById('style').value,
-        additionalInstructions: document.getElementById('additionalInstructions').value
-      };
+    // Get selected knowledge references
+    const knowledgeOptions = document.getElementById('knowledgeRefs').selectedOptions;
+    const knowledgeRefs = Array.from(knowledgeOptions).map(opt => opt.value);
+    
+    const formData = {
+      articleContent: document.getElementById('articleContent').value,
+      systemPrompt: document.getElementById('systemPrompt').value,
+      scriptCount: document.getElementById('scriptCount').value,
+      wordCount: document.getElementById('wordCount').value,
+      style: document.getElementById('style').value,
+      additionalInstructions: document.getElementById('additionalInstructions').value,
+      knowledgeRefs: knowledgeRefs
+    };
       
       // Call server function
       google.script.run
@@ -449,6 +665,46 @@ function getArticleFormHtml() {
         .processArticleForm(formData);
     });
   </script>
+  
+  <script>
+    // Populate knowledge base options on load
+    document.addEventListener('DOMContentLoaded', function() {
+      google.script.run
+        .withSuccessHandler(function(items) {
+          const select = document.getElementById('knowledgeRefs');
+          items.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item[0];
+            option.textContent = item[0] + ': ' + item[1];
+            select.appendChild(option);
+          });
+        })
+        .getKnowledgeBaseItems();
+    });
+  </script>
 </body>
 </html>`;
+}
+
+/**
+ * Set API Key through UI prompt
+ */
+function setApiKey() {
+  const ui = SpreadsheetApp.getUi();
+  const result = ui.prompt(
+    '🔑 Set DeepSeek API Key',
+    'Enter your DeepSeek API key:',
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (result.getSelectedButton() === ui.Button.OK) {
+    const apiKey = result.getResponseText().trim();
+    if (apiKey) {
+      const scriptProperties = PropertiesService.getScriptProperties();
+      scriptProperties.setProperty('DEEPSEEK_API_KEY', apiKey);
+      ui.alert('✅ API Key saved successfully!');
+    } else {
+      ui.alert('❌ Please enter a valid API key.');
+    }
+  }
 }
