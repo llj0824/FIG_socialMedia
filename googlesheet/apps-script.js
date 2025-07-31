@@ -24,8 +24,8 @@ const CONFIG = {
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('🎬 Script Generator')
-    .addItem('📝 New Article Form', 'showArticleForm')
-    .addItem('▶️ Process Selected Row', 'processSelectedRow')
+    .addItem('📝 Generate New Script', 'showArticleForm')
+    .addItem('▶️ Generate Scripts From Input Row', 'processSelectedRow')
     .addSeparator()
     .addItem('🔧 Initialize Sheets', 'initializeSheets')
     .addItem('🔑 Set DeepSeek API Key', 'setApiKey')
@@ -319,7 +319,7 @@ function showArticleForm() {
     .setWidth(650)
     .setHeight(700);
   
-  SpreadsheetApp.getUi().showModalDialog(html, 'Generate Video Scripts from Article');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Generate New Script');
 }
 
 /**
@@ -330,6 +330,9 @@ function processArticleForm(formData) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet();
     const inputSheet = sheet.getSheetByName(CONFIG.SHEETS.INPUT);
     
+    // Build system prompt based on selected styles
+    const systemPrompt = buildSystemPromptFromStyles(formData.scriptStyles);
+    
     // Build user prompt from form data
     const userPrompt = buildUserPromptFromForm(formData);
     
@@ -338,7 +341,7 @@ function processArticleForm(formData) {
     const newRow = [
       timestamp,                      // Timestamp
       formData.articleContent,        // Article Content
-      formData.systemPrompt,          // System Prompt
+      systemPrompt,                   // System Prompt (generated from styles)
       userPrompt,                     // User Prompt (includes knowledge base content)
       'Processing...',                // Status
       '',                            // Completed At
@@ -365,20 +368,65 @@ function processArticleForm(formData) {
 }
 
 /**
+ * Build system prompt from selected styles
+ */
+function buildSystemPromptFromStyles(scriptStyles) {
+  // Base system prompt
+  let systemPrompt = '你是一个短视频脚本创作专家，擅长将长文章改编成多个有吸引力的短视频脚本。';
+  
+  // Style-specific attributes
+  const styleAttributes = {
+    viral: '你特别擅长创作病毒式传播的内容，知道如何抓住热点和争议性话题。',
+    educational: '你善于将复杂知识简化，用通俗易懂的方式传播有价值的信息。',
+    story: '你是讲故事的高手，能从平凡中发现不平凡，创造引人入胜的叙事。',
+    conversational: '你的语言风格亲切自然，像朋友聊天一样让人感到舒适。',
+    professional: '你注重内容的准确性和权威性，用专业的态度对待每个话题。',
+    emotional: '你善于触动人心，能够准确把握和调动观众的情绪。',
+    humorous: '你有幽默感，能够用轻松有趣的方式呈现内容。'
+  };
+  
+  // Add attributes based on selected styles
+  if (scriptStyles && scriptStyles.length > 0) {
+    scriptStyles.forEach(style => {
+      if (styleAttributes[style]) {
+        systemPrompt += styleAttributes[style];
+      }
+    });
+  }
+  
+  // Add common requirements
+  systemPrompt += '每个脚本都要有强烈的开头钩子，适合口播，能在短时间内吸引并保持观众注意力。';
+  
+  return systemPrompt;
+}
+
+/**
  * Build user prompt from form data
  */
 function buildUserPromptFromForm(formData) {
+  // Comprehensive style mapping including both content type and tone
   const styleMap = {
-    conversational: '使用口语化表达，用"兄弟"、"朋友们"等称呼',
-    professional: '使用专业严谨的语言，有理有据',
-    emotional: '注重情绪渲染，引起观众共鸣',
-    humorous: '加入幽默元素，让内容轻松有趣'
+    viral: '病毒式传播内容 - 注重强钩子、情绪点和争议性话题，让人看了想评论或分享',
+    educational: '知识类内容 - 把复杂概念讲解得通俗易懂，用生动的例子和类比',
+    story: '故事型内容 - 从普通内容中提取精彩故事，有起承转合、悬念和反转',
+    conversational: '口语化表达 - 使用"兄弟"、"朋友们"等称呼，拉近距离',
+    professional: '专业严谨 - 使用专业语言，有理有据，适合知识分享',
+    emotional: '情绪化 - 注重情绪渲染，引起观众共鸣',
+    humorous: '幽默风趣 - 加入幽默元素，让内容轻松有趣'
   };
   
   let prompt = `请根据文章内容生成${formData.scriptCount}个短视频脚本。\n\n`;
   prompt += `要求：\n`;
   prompt += `- 每个脚本${formData.wordCount}字\n`;
-  prompt += `- 风格：${styleMap[formData.style]}\n`;
+  
+  // Handle multiple selected styles
+  if (formData.scriptStyles && formData.scriptStyles.length > 0) {
+    prompt += `- 风格要求：\n`;
+    formData.scriptStyles.forEach(style => {
+      prompt += `  • ${styleMap[style]}\n`;
+    });
+  }
+  
   prompt += `- 每个脚本要有不同的角度和侧重点\n`;
   prompt += `- 开头必须有强钩子，3秒内吸引注意力\n`;
   
@@ -527,7 +575,7 @@ function getArticleFormHtml() {
   </style>
 </head>
 <body>
-  <h2>🎬 Article to Video Script Generator</h2>
+  <h2>🎬 Generate New Script</h2>
   
   <form id="scriptForm">
     <div class="form-group">
@@ -537,16 +585,6 @@ function getArticleFormHtml() {
       <div class="help-text">The source article you want to convert into video scripts</div>
     </div>
 
-    <div class="form-group">
-      <label for="systemPrompt">System Prompt (AI Role)</label>
-      <div class="preset-buttons">
-        <button type="button" class="preset-btn" onclick="setPreset('viral')">Viral Content</button>
-        <button type="button" class="preset-btn" onclick="setPreset('educational')">Educational</button>
-        <button type="button" class="preset-btn" onclick="setPreset('story')">Story-based</button>
-      </div>
-      <textarea id="systemPrompt" name="systemPrompt" class="small-textarea">你是一个短视频脚本创作专家，擅长将长文章改编成多个有吸引力的短视频脚本。每个脚本要有强烈的开头钩子，口语化表达，适合口播。</textarea>
-      <div class="help-text">Define how the AI should behave (you can edit this)</div>
-    </div>
 
     <div class="form-group">
       <label for="scriptCount">Number of Scripts</label>
@@ -568,13 +606,17 @@ function getArticleFormHtml() {
     </div>
 
     <div class="form-group">
-      <label for="style">Script Style</label>
-      <select id="style" name="style">
-        <option value="conversational">Conversational (用"兄弟"等口语)</option>
+      <label for="scriptStyles">Script Styles (Select Multiple)</label>
+      <select id="scriptStyles" name="scriptStyles" multiple style="height: 150px">
+        <option value="viral">Viral Content (病毒式传播)</option>
+        <option value="educational">Educational (知识类)</option>
+        <option value="story">Story-based (故事型)</option>
+        <option value="conversational">Conversational (口语化)</option>
         <option value="professional">Professional (专业严谨)</option>
-        <option value="emotional">Emotional (情绪化，引共鸣)</option>
+        <option value="emotional">Emotional (情绪化)</option>
         <option value="humorous">Humorous (幽默风趣)</option>
       </select>
+      <div class="help-text">Select one or more styles (hold Ctrl/Cmd to multi-select)</div>
     </div>
 
     <div class="form-group">
@@ -600,16 +642,6 @@ function getArticleFormHtml() {
   <div id="status"></div>
 
   <script>
-    // Preset system prompts
-    const presets = {
-      viral: '你是一个短视频脚本专家，擅长创作病毒式传播的内容。注重强钩子、情绪点和争议性话题。每个脚本都要让人看了想评论或分享。',
-      educational: '你是一个知识类短视频创作者，擅长把复杂概念讲解得通俗易懂。用生动的例子和类比，让观众轻松学到知识。',
-      story: '你是一个故事型短视频编剧，擅长从普通内容中提取精彩故事。每个脚本都要有起承转合，有悬念和反转。'
-    };
-
-    function setPreset(type) {
-      document.getElementById('systemPrompt').value = presets[type];
-    }
 
     // Form submission
     document.getElementById('scriptForm').addEventListener('submit', function(e) {
@@ -632,12 +664,15 @@ function getArticleFormHtml() {
     const knowledgeOptions = document.getElementById('knowledgeRefs').selectedOptions;
     const knowledgeRefs = Array.from(knowledgeOptions).map(opt => opt.value);
     
+    // Get selected script styles
+    const styleOptions = document.getElementById('scriptStyles').selectedOptions;
+    const scriptStyles = Array.from(styleOptions).map(opt => opt.value);
+    
     const formData = {
       articleContent: document.getElementById('articleContent').value,
-      systemPrompt: document.getElementById('systemPrompt').value,
+      scriptStyles: scriptStyles,
       scriptCount: document.getElementById('scriptCount').value,
       wordCount: document.getElementById('wordCount').value,
-      style: document.getElementById('style').value,
       additionalInstructions: document.getElementById('additionalInstructions').value,
       knowledgeRefs: knowledgeRefs
     };
