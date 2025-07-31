@@ -8,7 +8,7 @@ const CONFIG = {
   SHEETS: {
     INPUT: 'Input',
     RESULTS: 'Results',
-    KNOWLEDGE_BASE: 'knowledge_base'
+    REFERENCE_MATERIAL: 'Reference Material'
   },
   API: {
     DEEPSEEK_ENDPOINT: 'https://api.deepseek.com/v1/chat/completions',
@@ -26,6 +26,7 @@ function onOpen() {
   ui.createMenu('🎬 Script Generator')
     .addItem('📝 Generate New Script', 'showArticleForm')
     .addItem('▶️ Generate Scripts From Input Row', 'processSelectedRow')
+    .addItem('📤 Upload Reference Material', 'showReferenceMaterialForm')
     .addSeparator()
     .addItem('🔧 Initialize Sheets', 'initializeSheets')
     .addItem('🔑 Set DeepSeek API Key', 'setApiKey')
@@ -114,63 +115,58 @@ function initializeSheets(showAlert = true) {
     resultsSheet.setColumnWidth(11, 150); // Processing Time
   }
   
-  // Initialize Knowledge Base sheet
-  let kbSheet = spreadsheet.getSheetByName(CONFIG.SHEETS.KNOWLEDGE_BASE);
-  if (!kbSheet) {
-    kbSheet = spreadsheet.insertSheet(CONFIG.SHEETS.KNOWLEDGE_BASE);
-    kbSheet.appendRow([
+  // Initialize Reference Material sheet
+  let refSheet = spreadsheet.getSheetByName(CONFIG.SHEETS.REFERENCE_MATERIAL);
+  if (!refSheet) {
+    refSheet = spreadsheet.insertSheet(CONFIG.SHEETS.REFERENCE_MATERIAL);
+    refSheet.appendRow([
       'ID',
       'Title',
       'Content',
-      'Category',
-      'Tags',
-      'Created Date',
-      'Last Updated'
+      'Purpose',
+      'Usage Notes',
+      'Upload Date'
     ]);
     
     // Format headers
-    const headerRange = kbSheet.getRange(1, 1, 1, 7);
+    const headerRange = refSheet.getRange(1, 1, 1, 6);
     headerRange.setFontWeight('bold');
     headerRange.setBackground('#fbbc04');
     headerRange.setFontColor('#000000');
     
     // Set column widths
-    kbSheet.setColumnWidth(1, 80);  // ID
-    kbSheet.setColumnWidth(2, 200); // Title
-    kbSheet.setColumnWidth(3, 500); // Content
-    kbSheet.setColumnWidth(4, 150); // Category
-    kbSheet.setColumnWidth(5, 200); // Tags
-    kbSheet.setColumnWidth(6, 150); // Created Date
-    kbSheet.setColumnWidth(7, 150); // Last Updated
+    refSheet.setColumnWidth(1, 80);  // ID
+    refSheet.setColumnWidth(2, 250); // Title
+    refSheet.setColumnWidth(3, 500); // Content
+    refSheet.setColumnWidth(4, 300); // Purpose
+    refSheet.setColumnWidth(5, 250); // Usage Notes
+    refSheet.setColumnWidth(6, 150); // Upload Date
     
-    // Add sample knowledge base entries
-    kbSheet.appendRow([
-      'KB001',
+    // Add sample reference material entries
+    refSheet.appendRow([
+      'REF001',
       '短视频开头钩子技巧',
       '1. 疑问式开头：直接抛出观众关心的问题\n2. 冲突式开头：展示矛盾或争议性观点\n3. 结果前置：先展示惊人结果再讲过程\n4. 情绪共鸣：用情绪化语言引起共鸣',
-      'Script Writing',
-      'hooks, opening, engagement',
-      new Date(),
+      '这是我总结的有效开头技巧，希望新脚本都能用类似的钩子方式吸引观众',
+      '根据内容选择合适的钩子类型',
       new Date()
     ]);
     
-    kbSheet.appendRow([
-      'KB002',
+    refSheet.appendRow([
+      'REF002',
       '口播视频节奏控制',
       '1. 每句话控制在15-20字以内\n2. 使用短句和断句增加节奏感\n3. 重要信息重复2-3次\n4. 每30秒设置一个小高潮',
-      'Script Writing',
-      'pacing, rhythm, structure',
-      new Date(),
+      '这是让口播视频保持节奏感的方法，按这个节奏写脚本观众不容易走神',
+      '特别适合教育类内容',
       new Date()
     ]);
     
-    kbSheet.appendRow([
-      'KB003',
+    refSheet.appendRow([
+      'REF003',
       '情绪化表达技巧',
       '1. 使用"你"而不是"大家"\n2. 加入个人经历和故事\n3. 使用具体数字和案例\n4. 适当使用夸张和对比',
-      'Script Writing',
-      'emotion, engagement, storytelling',
-      new Date(),
+      '用这些技巧让内容更有感染力，观众更容易产生共鸣',
+      '适合故事类和情感类内容',
       new Date()
     ]);
   }
@@ -345,7 +341,7 @@ function processArticleForm(formData) {
       userPrompt,                     // User Prompt (includes knowledge base content)
       'Processing...',                // Status
       '',                            // Completed At
-      formData.knowledgeRefs ? formData.knowledgeRefs.join(', ') : '' // Knowledge Base References
+      formData.referenceIds ? formData.referenceIds.join(', ') : '' // Reference Material IDs
     ];
     
     inputSheet.appendRow(newRow);
@@ -434,49 +430,63 @@ function buildUserPromptFromForm(formData) {
     prompt += `\n特别要求：${formData.additionalInstructions}`;
   }
 
-  if (formData.knowledgeRefs && formData.knowledgeRefs.length > 0) {
-    const kbContent = getKnowledgeContent(formData.knowledgeRefs);
-    prompt += `\n参考内容（仅供引用，不直接使用）：\n${kbContent}\n\n`;
-    prompt += `注意：上述参考内容仅作为背景知识，不要直接复制或改写。`;
+  if (formData.referenceIds && formData.referenceIds.length > 0) {
+    const references = getReferenceMaterials(formData.referenceIds);
+    prompt += `\n\n参考材料：\n`;
+    references.forEach(ref => {
+      prompt += `\n【${ref.title}】\n`;
+      prompt += `用途说明：${ref.purpose}\n`;
+      prompt += `参考内容：${ref.content}\n`;
+      if (ref.usageNotes) {
+        prompt += `补充说明：${ref.usageNotes}\n`;
+      }
+    });
+    prompt += `\n请智能地运用这些参考材料，根据各自的用途说明来指导你的创作。`;
   }
   
   return prompt;
 }
 
 /**
- * Get knowledge base content for given IDs
+ * Get reference materials for given IDs
  */
-function getKnowledgeContent(ids) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.KNOWLEDGE_BASE);
-  if (!sheet) return '';
+function getReferenceMaterials(ids) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.REFERENCE_MATERIAL);
+  if (!sheet) return [];
   
   const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const content = [];
+  const materials = [];
   
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (ids.includes(row[0])) {
-      content.push(`【参考${row[0]}】${row[2]}`);
+      materials.push({
+        id: row[0],
+        title: row[1],
+        content: row[2],
+        purpose: row[3],
+        usageNotes: row[4],
+        uploadDate: row[5]
+      });
     }
   }
   
-  return content.join('\n\n');
+  return materials;
 }
 
 /**
  * Get HTML for the article form
  */
 /**
- * Get knowledge base items for form dropdown
+ * Get reference material items for form dropdown
  */
-function getKnowledgeBaseItems() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.KNOWLEDGE_BASE);
+function getReferenceMaterialItems() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEETS.REFERENCE_MATERIAL);
   if (!sheet) return [];
   
   const data = sheet.getDataRange().getValues();
   // Skip header row
-  return data.slice(1).map(row => [row[0], row[1]]); // [ID, Title]
+  return data.slice(1).map(row => [row[0], row[1], row[3]]); // [ID, Title, Purpose]
 }
 
 function getArticleFormHtml() {
@@ -620,11 +630,11 @@ function getArticleFormHtml() {
     </div>
 
     <div class="form-group">
-      <label for="knowledgeRefs">Reference Knowledge Base</label>
-      <select id="knowledgeRefs" name="knowledgeRefs" multiple style="height: 100px">
+      <label for="referenceIds">Reference Materials</label>
+      <select id="referenceIds" name="referenceIds" multiple style="height: 120px">
         <!-- Options will be populated dynamically -->
       </select>
-      <div class="help-text">Select reference materials (hold Ctrl/Cmd to multi-select)</div>
+      <div class="help-text">Select reference materials to guide the script generation (hold Ctrl/Cmd to multi-select)</div>
     </div>
 
     <div class="form-group">
@@ -660,9 +670,9 @@ function getArticleFormHtml() {
       status.style.display = 'block';
       
       // Gather form data
-    // Get selected knowledge references
-    const knowledgeOptions = document.getElementById('knowledgeRefs').selectedOptions;
-    const knowledgeRefs = Array.from(knowledgeOptions).map(opt => opt.value);
+    // Get selected reference materials
+    const referenceOptions = document.getElementById('referenceIds').selectedOptions;
+    const referenceIds = Array.from(referenceOptions).map(opt => opt.value);
     
     // Get selected script styles
     const styleOptions = document.getElementById('scriptStyles').selectedOptions;
@@ -674,7 +684,7 @@ function getArticleFormHtml() {
       scriptCount: document.getElementById('scriptCount').value,
       wordCount: document.getElementById('wordCount').value,
       additionalInstructions: document.getElementById('additionalInstructions').value,
-      knowledgeRefs: knowledgeRefs
+      referenceIds: referenceIds
     };
       
       // Call server function
@@ -702,19 +712,22 @@ function getArticleFormHtml() {
   </script>
   
   <script>
-    // Populate knowledge base options on load
+    // Populate reference material options on load
     document.addEventListener('DOMContentLoaded', function() {
       google.script.run
         .withSuccessHandler(function(items) {
-          const select = document.getElementById('knowledgeRefs');
+          const select = document.getElementById('referenceIds');
           items.forEach(item => {
             const option = document.createElement('option');
             option.value = item[0];
             option.textContent = item[0] + ': ' + item[1];
+            if (item[2]) {
+              option.title = 'Purpose: ' + item[2]; // Show purpose on hover
+            }
             select.appendChild(option);
           });
         })
-        .getKnowledgeBaseItems();
+        .getReferenceMaterialItems();
     });
   </script>
 </body>
@@ -742,4 +755,226 @@ function setApiKey() {
       ui.alert('❌ Please enter a valid API key.');
     }
   }
+}
+
+/**
+ * Show the reference material upload form
+ */
+function showReferenceMaterialForm() {
+  const html = HtmlService.createHtmlOutput(getReferenceMaterialFormHtml())
+    .setWidth(650)
+    .setHeight(600);
+  
+  SpreadsheetApp.getUi().showModalDialog(html, 'Upload Reference Material');
+}
+
+/**
+ * Process reference material form submission
+ */
+function processReferenceMaterialForm(formData) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet();
+    const refSheet = sheet.getSheetByName(CONFIG.SHEETS.REFERENCE_MATERIAL);
+    
+    // Generate unique ID
+    const lastRow = refSheet.getLastRow();
+    const newId = 'REF' + String(lastRow).padStart(3, '0');
+    
+    // Add new reference material
+    const newRow = [
+      newId,                        // ID
+      formData.title,               // Title
+      formData.content,             // Content
+      formData.purpose,             // Purpose
+      formData.usageNotes || '',    // Usage Notes
+      new Date()                    // Upload Date
+    ];
+    
+    refSheet.appendRow(newRow);
+    
+    return {
+      success: true,
+      id: newId,
+      title: formData.title
+    };
+    
+  } catch (error) {
+    console.error('Reference material upload error:', error);
+    throw new Error(error.toString());
+  }
+}
+
+/**
+ * Get HTML for the reference material upload form
+ */
+function getReferenceMaterialFormHtml() {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+    .large-textarea {
+      min-height: 200px;
+    }
+    .help-text {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+    button {
+      background-color: #4285f4;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover {
+      background-color: #357ae8;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .example {
+      background-color: #f0f0f0;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <h2>📤 Upload Reference Material</h2>
+  
+  <form id="referenceForm">
+    <div class="form-group">
+      <label for="title">Title *</label>
+      <input type="text" id="title" name="title" required 
+             placeholder="What do you call this reference?">
+      <div class="help-text">A short, memorable name for this reference material</div>
+    </div>
+
+    <div class="form-group">
+      <label for="content">Content *</label>
+      <textarea id="content" name="content" required class="large-textarea"
+                placeholder="Paste your reference material here..."></textarea>
+      <div class="help-text">The actual content you want to use as reference (script, technique, example, etc.)</div>
+    </div>
+
+    <div class="form-group">
+      <label for="purpose">Purpose *</label>
+      <textarea id="purpose" name="purpose" required
+                placeholder="Explain why you're adding this and how it should be used..."></textarea>
+      <div class="help-text">Tell the AI how to use this reference material</div>
+      <div class="example">
+        <strong>Example:</strong> "This script got 285K views. I want new scripts to have similar pacing and emotional beats but different content"
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="usageNotes">Usage Notes (Optional)</label>
+      <textarea id="usageNotes" name="usageNotes"
+                placeholder="Any additional guidance or context..."></textarea>
+      <div class="help-text">Optional additional instructions or context</div>
+    </div>
+
+    <div>
+      <button type="submit" id="submitBtn">Upload Reference</button>
+      <button type="button" onclick="google.script.host.close()">Cancel</button>
+    </div>
+  </form>
+
+  <div id="status"></div>
+
+  <script>
+    document.getElementById('referenceForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById('submitBtn');
+      const status = document.getElementById('status');
+      
+      // Disable submit button
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Uploading...';
+      
+      // Gather form data
+      const formData = {
+        title: document.getElementById('title').value,
+        content: document.getElementById('content').value,
+        purpose: document.getElementById('purpose').value,
+        usageNotes: document.getElementById('usageNotes').value
+      };
+      
+      // Call server function
+      google.script.run
+        .withSuccessHandler(function(result) {
+          status.className = 'success';
+          status.innerHTML = '✅ Reference material uploaded successfully!<br>' +
+                             '<strong>' + result.id + '</strong>: ' + result.title + '<br>' +
+                             '<small>You can now select this in the script generation form.</small>';
+          status.style.display = 'block';
+          
+          // Reset form
+          document.getElementById('referenceForm').reset();
+          submitBtn.textContent = 'Upload Another Reference';
+          submitBtn.disabled = false;
+        })
+        .withFailureHandler(function(error) {
+          status.className = 'error';
+          status.textContent = '❌ Error: ' + error.message;
+          status.style.display = 'block';
+          submitBtn.textContent = 'Upload Reference';
+          submitBtn.disabled = false;
+        })
+        .processReferenceMaterialForm(formData);
+    });
+  </script>
+</body>
+</html>`;
 }
